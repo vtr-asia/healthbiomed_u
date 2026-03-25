@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>勞工體格管理分析 - Launch</title>
+    <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+        .spinner { 
+            display: inline-block; 
+            width: 50px; 
+            height: 50px; 
+            border: 5px solid #f3f3f3; 
+            border-top: 5px solid #3498db; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <h2>正在啟動勞工體格管理分析應用...</h2>
+    <div class="spinner"></div>
+
+    <script>
+        FHIR.oauth2.authorize({
+            // 使用大會提供之測試用憑證
+            client_id: "cc344727-6f90-496c-94fd-c7829aa9a51d", 
+            client_secret: "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e",
+            
+            // 設定存取權限範圍
+            scope: "launch patient/Observation.read patient/Condition.read patient/Patient.read user/*.read openid profile", 
+            
+            // 授權成功後的重導向頁面
+            redirect_uri: "./index.html"
+        });
+    </script>
+</body>
+</html>
