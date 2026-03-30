@@ -5,35 +5,58 @@
     <title>勞工體格管理分析 - Launch</title>
     <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
-        .spinner { 
-            display: inline-block; 
-            width: 50px; 
-            height: 50px; 
-            border: 5px solid #f3f3f3; 
-            border-top: 5px solid #3498db; 
-            border-radius: 50%; 
-            animation: spin 1s linear infinite; 
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background: #f0f9ff; }
+        h2 { color: #1e40af; margin-bottom: 24px; }
+        .spinner {
+            display: inline-block; width: 50px; height: 50px;
+            border: 5px solid #bfdbfe; border-top: 5px solid #3b82f6;
+            border-radius: 50%; animation: spin 1s linear infinite;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error {
+            display: none; margin: 24px auto; max-width: 480px;
+            background: #fee2e2; border: 1px solid #fca5a5;
+            color: #991b1b; padding: 16px 20px; border-radius: 10px;
+            line-height: 1.7; text-align: left;
+        }
+        a { color: #2563eb; }
     </style>
 </head>
 <body>
     <h2>正在啟動勞工體格管理分析應用...</h2>
-    <div class="spinner"></div>
+    <div class="spinner" id="spinner"></div>
+    <div class="error" id="errorBox"></div>
 
     <script>
-        FHIR.oauth2.authorize({
-            // 使用大會提供之測試用憑證
-            client_id: "cc344727-6f90-496c-94fd-c7829aa9a51d", 
-            client_secret: "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e",
-            
-            // 設定存取權限範圍
-            scope: "launch patient/Observation.read patient/Condition.read patient/Patient.read user/*.read openid profile", 
-            
-            // 授權成功後的重導向頁面
-            redirect_uri: "./index.html"
-        });
+        function showError(msg) {
+            document.getElementById('spinner').style.display = 'none';
+            const box = document.getElementById('errorBox');
+            box.style.display = 'block';
+            box.innerHTML = msg;
+        }
+
+        // ✅ 修復 1：從 URL query string 讀取 SMART Health IT launcher 帶入的 iss
+        const params = new URLSearchParams(window.location.search);
+        const iss    = params.get('iss');
+
+        if (!iss) {
+            showError(
+                '❌ 缺少 <code>iss</code> 參數。<br><br>' +
+                '請從 <a href="https://launch.smarthealthit.org/" target="_blank">' +
+                'https://launch.smarthealthit.org/</a> 選擇病人後啟動本應用程式，<br>' +
+                '不要直接在瀏覽器開啟此頁面。'
+            );
+        } else {
+            FHIR.oauth2.authorize({
+                iss:         iss,                // ✅ 修復 1：動態傳入 iss
+                clientId:    "labor_health_app", // ✅ 修復 2：camelCase（原 client_id 無效）
+                                                 // ✅ 修復 3：移除 client_secret（public client 不需要且有安全風險）
+                scope:       "launch openid fhirUser patient/Patient.read patient/Observation.read patient/Condition.read",
+                redirectUri: "index.html"        // ✅ 修復 4：camelCase（原 redirect_uri 無效）
+            }).catch(err => {
+                showError('❌ 授權失敗：' + (err.message || JSON.stringify(err)));
+            });
+        }
     </script>
 </body>
 </html>
