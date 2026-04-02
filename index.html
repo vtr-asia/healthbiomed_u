@@ -3,180 +3,226 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>勞工體格管理分析系統 - FHIR 整合版</title>
+    <title>好健康 - 員工健康比較分析系統</title>
     <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #f3f4f6; min-height: 100vh; font-family: sans-serif; }
-        .info-pill { @apply px-4 py-1 bg-white/20 rounded-full text-sm font-medium border border-white/30; }
-        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        body { background: #f8fafc; font-family: sans-serif; }
+        .card { background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .sticky-banner { position: sticky; top: 0; z-index: 50; }
+        .stat-box { @apply p-4 bg-slate-50 rounded-xl border border-slate-100 text-center; }
     </style>
 </head>
-<body class="pb-10">
+<body class="pb-12">
 
-    <div id="patient-banner" class="bg-indigo-900 text-white shadow-lg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-6 py-4">
-            <div class="flex flex-wrap items-center justify-between gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 bg-indigo-500 rounded-full flex items-center justify-center text-xl font-bold">
-                        <span id="name-initial">?</span>
-                    </div>
-                    <div>
-                        <div class="text-xs text-indigo-300 font-bold uppercase tracking-wider">當前檢測員工</div>
-                        <div class="text-2xl font-bold leading-tight" id="disp-name">載入中...</div>
-                    </div>
+    <div id="patient-banner" class="sticky-banner bg-indigo-900 text-white shadow-xl">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-2xl font-bold border-2 border-white/30" id="name-icon">?</div>
+                <div>
+                    <div class="text-xs text-indigo-300 font-bold tracking-widest uppercase">當前受測員工</div>
+                    <div class="text-2xl font-bold" id="disp-name">載入中...</div>
                 </div>
-                
-                <div class="flex flex-wrap gap-3 items-center">
-                    <div class="info-pill">ID: <span id="disp-id">--</span></div>
-                    <div class="info-pill">性別: <span id="disp-gender">--</span></div>
-                    <div class="info-pill">年齡: <span id="disp-age">--</span> 歲</div>
-                    <div id="connection-status" class="px-3 py-1 rounded-full text-xs font-black bg-yellow-500 text-yellow-950 animate-pulse">
-                        CONNECTING
-                    </div>
-                </div>
+            </div>
+            
+            <div class="flex flex-wrap gap-4 text-sm font-medium">
+                <div class="bg-white/10 px-4 py-2 rounded-lg border border-white/20">ID: <span id="disp-id" class="text-indigo-200">--</span></div>
+                <div class="bg-white/10 px-4 py-2 rounded-lg border border-white/20">性別: <span id="disp-gender" class="text-indigo-200">--</span></div>
+                <div class="bg-white/10 px-4 py-2 rounded-lg border border-white/20">年齡: <span id="disp-age" class="text-indigo-200">--</span> 歲</div>
+                <div id="conn-status" class="px-4 py-2 rounded-lg bg-yellow-500 text-yellow-950 font-black text-xs flex items-center">連線中...</div>
             </div>
         </div>
     </div>
 
-    <main class="max-w-7xl mx-auto px-6 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <main class="max-w-7xl mx-auto px-6 mt-8">
         
-        <div class="card p-6 border-t-4 border-indigo-500">
-            <h2 class="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
-                📊 最近生理指標 (FHIR)
-            </h2>
-            <div id="vitals-display" class="space-y-4">
-                <div class="flex justify-between border-b pb-2"><span>BMI</span><span class="font-bold text-indigo-600" id="v-bmi">--</span></div>
-                <div class="flex justify-between border-b pb-2"><span>血壓</span><span class="font-bold text-indigo-600" id="v-bp">--</span></div>
-                <div class="flex justify-between border-b pb-2"><span>糖化血色素</span><span class="font-bold text-indigo-600" id="v-hba1c">--</span></div>
-            </div>
-        </div>
-
-        <div class="lg:col-span-2 card p-6 border-t-4 border-green-500">
-            <h2 class="text-lg font-bold text-gray-700 mb-4">群體健康分佈分析</h2>
-            <div class="h-64">
-                <canvas id="mainChart"></canvas>
-            </div>
-        </div>
-
-        <div class="lg:col-span-3 card p-6 border-t-4 border-red-500">
-            <h2 class="text-lg font-bold text-red-700 mb-4">⚠️ 健康預警清單</h2>
-            <div id="alert-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            
+            <div class="card p-6 lg:col-span-2">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-slate-800 text-center w-full">個人生理指標 vs. 26人平均值</h2>
                 </div>
+                <div class="h-80">
+                    <canvas id="compareRadarChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card p-6 border-l-8 border-indigo-500 bg-indigo-50/30">
+                <h2 class="text-xl font-bold text-indigo-900 mb-6">健康比較結論</h2>
+                <div id="insight-content" class="space-y-5 text-slate-700">
+                    <p class="animate-pulse">正在運算群體差異...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="card p-6">
+                <h3 class="text-center font-bold text-slate-600 mb-4">BMI 區間對比</h3>
+                <canvas id="bmiBarChart"></canvas>
+                <p id="bmi-text" class="mt-4 text-sm text-center text-slate-500 font-medium"></p>
+            </div>
+            <div class="card p-6">
+                <h3 class="text-center font-bold text-slate-600 mb-4">血壓趨勢對比 (mmHg)</h3>
+                <canvas id="bpBarChart"></canvas>
+                <p id="bp-text" class="mt-4 text-sm text-center text-slate-500 font-medium"></p>
+            </div>
+            <div class="card p-6">
+                <h3 class="text-center font-bold text-slate-600 mb-4">血糖數據對比 (mg/dL)</h3>
+                <canvas id="gluBarChart"></canvas>
+                <p id="glu-text" class="mt-4 text-sm text-center text-slate-500 font-medium"></p>
+            </div>
         </div>
     </main>
 
     <script>
-        // 模擬的歷史資料備援
-        const backupData = [
-            { name: "林o恩", bmi: 35.7, sbp: 132 },
-            { name: "陳o霖", bmi: 32.9, sbp: 150 }
+        // 原始 26 位員工資料庫 (作為對照組)
+        const staffData = [
+            { name: "林o恩", height:177, weight:112, bmi:35.7, sbp:132, dbp:81, glucose:100 },
+            { name: "陳o霖", height:154, weight:78, bmi:32.9, sbp:150, dbp:105, glucose:105 },
+            { name: "張o晴", height:165, weight:98, bmi:36.0, sbp:116, dbp:84, glucose:92 },
+            { name: "蔡o宏", height:178, weight:91, bmi:28.7, sbp:120, dbp:67, glucose:80 },
+            { name: "許o筑", height:171, weight:80, bmi:27.4, sbp:128, dbp:78, glucose:95 },
+            { name: "郭o翔", height:160, weight:68, bmi:26.6, sbp:132, dbp:72, glucose:75 },
+            { name: "王o萱", height:156, weight:70, bmi:28.8, sbp:136, dbp:83, glucose:106 },
+            { name: "楊o維", height:180, weight:53, bmi:16.4, sbp:123, dbp:81, glucose:88 },
+            { name: "郭o涵", height:159, weight:98, bmi:38.8, sbp:104, dbp:67, glucose:134 },
+            { name: "曾o安", height:176, weight:71, bmi:22.9, sbp:120, dbp:67, glucose:104 },
+            { name: "趙o豪", height:158, weight:100, bmi:40.1, sbp:125, dbp:90, glucose:82 },
+            { name: "林o瑄", height:167, weight:85, bmi:30.5, sbp:100, dbp:90, glucose:102 },
+            { name: "劉o宇", height:159, weight:96, bmi:38.0, sbp:108, dbp:77, glucose:91 },
+            { name: "陳o雅", height:157, weight:106, bmi:43.0, sbp:112, dbp:83, glucose:74 },
+            { name: "黃o哲", height:169, weight:77, bmi:27.0, sbp:140, dbp:77, glucose:99 },
+            { name: "王o妤", height:178, weight:46, bmi:14.5, sbp:136, dbp:67, glucose:92 },
+            { name: "郭o翰", height:156, weight:98, bmi:40.3, sbp:136, dbp:79, glucose:106 },
+            { name: "林o彤", height:167, weight:90, bmi:32.3, sbp:128, dbp:81, glucose:76 },
+            { name: "張o瑋", height:161, weight:90, bmi:34.7, sbp:164, dbp:104, glucose:76 },
+            { name: "陳o萱", height:188, weight:91, bmi:25.7, sbp:122, dbp:83, glucose:72 },
+            { name: "劉o駿", height:170, weight:55, bmi:19.0, sbp:179, dbp:111, glucose:106 },
+            { name: "楊o琪", height:180, weight:66, bmi:20.4, sbp:134, dbp:90, glucose:84 },
+            { name: "吳o辰", height:185, weight:92, bmi:26.9, sbp:131, dbp:80, glucose:89 },
+            { name: "鄭o晴", height:171, weight:71, bmi:24.3, sbp:134, dbp:87, glucose:93 },
+            { name: "邱o諺", height:186, weight:88, bmi:25.4, sbp:110, dbp:72, glucose:71 },
+            { name: "許o媗", height:184, weight:65, bmi:19.2, sbp:180, dbp:118, glucose:76 }
         ];
 
-        async function initializeApp() {
+        async function startAnalysis() {
+            const statusBox = document.getElementById('conn-status');
             try {
-                // 1. 等待 FHIR 授權
+                // 1. 初始化 FHIR 連線
                 const client = await FHIR.oauth2.ready();
-                
-                // 2. 抓取病人基本資料
                 const patient = await client.patient.read();
-                updatePatientBanner(patient);
-
-                // 3. 抓取生理數據 (Observations)
-                const observations = await client.request(`Observation?patient=${client.patient.id}&_sort=-date&_count=20`);
-                const remoteData = processObservations(observations, patient);
-
-                // 4. 更新 UI
-                document.getElementById('connection-status').innerText = "ONLINE";
-                document.getElementById('connection-status').className = "px-3 py-1 rounded-full text-xs font-black bg-green-500 text-white";
+                const observations = await client.request(`Observation?patient=${client.patient.id}&_sort=-date&_count=50`);
                 
-                renderUI([remoteData, ...backupData]);
+                // 2. 解析當前病人
+                const currentPatient = parseFHIRData(patient, observations);
+                updateBanner(currentPatient);
+                
+                // 3. 計算 26 人平均值
+                const avgData = calcAvg(staffData);
+                
+                // 4. 繪圖與分析
+                renderAllCharts(currentPatient, avgData);
+                renderInsights(currentPatient, avgData);
+
+                statusBox.innerText = "ONLINE";
+                statusBox.className = "px-4 py-2 rounded-lg bg-green-500 text-white font-black text-xs";
 
             } catch (err) {
-                console.error("FHIR Error:", err);
-                showDemoMode();
+                console.warn("進入 Demo 模式:", err);
+                statusBox.innerText = "DEMO MODE";
+                statusBox.className = "px-4 py-2 rounded-lg bg-blue-500 text-white font-black text-xs";
+                // 使用第一位員工作為 Demo 對象
+                const demoUser = staffData[0];
+                demoUser.id = "DEMO-001";
+                demoUser.gender = "male";
+                demoUser.birth = "1990-01-01";
+                updateBanner(demoUser);
+                renderAllCharts(demoUser, calcAvg(staffData.slice(1)));
             }
         }
 
-        function updatePatientBanner(p) {
-            const familyName = p.name?.[0]?.family || "";
-            const givenName = p.name?.[0]?.given?.[0] || "";
-            const fullName = familyName + givenName || "未知姓名";
+        function parseFHIRData(p, obs) {
+            const name = (p.name?.[0]?.family || "") + (p.name?.[0]?.given?.[0] || "");
+            const res = { name: name || "未知姓名", id: p.id, gender: p.gender, birth: p.birthDate, bmi: 0, sbp: 0, dbp: 0, glucose: 0 };
             
-            // 更新頂端欄
-            document.getElementById('disp-name').innerText = fullName;
-            document.getElementById('name-initial').innerText = fullName.charAt(0);
-            document.getElementById('disp-id').innerText = p.id;
-            document.getElementById('disp-gender').innerText = p.gender === 'male' ? '男' : p.gender === 'female' ? '女' : '未知';
-            
-            // 計算年齡
-            if (p.birthDate) {
-                const birth = new Date(p.birthDate);
-                const today = new Date();
-                let age = today.getFullYear() - birth.getFullYear();
-                const m = today.getMonth() - birth.getMonth();
-                if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-                document.getElementById('disp-age').innerText = age;
-            }
-        }
-
-        function processObservations(bundle, patient) {
-            const entries = bundle.entry || [];
-            let record = { name: "目前員工", bmi: 0, sbp: 0, dbp: 0, glucose: 0 };
-            
-            entries.forEach(item => {
-                const res = item.resource;
-                const code = res.code?.coding?.[0]?.code;
-                const val = res.valueQuantity?.value;
-
-                if (code === "39156-5") { record.bmi = val; document.getElementById('v-bmi').innerText = val; }
-                if (code === "55284-4") { // Blood Pressure
-                    res.component?.forEach(c => {
+            obs.entry?.forEach(e => {
+                const r = e.resource;
+                const code = r.code?.coding?.[0]?.code;
+                const val = r.valueQuantity?.value;
+                if (code === "39156-5") res.bmi = val;
+                if (code === "2339-0") res.glucose = val;
+                if (code === "55284-4") {
+                    r.component?.forEach(c => {
                         const cCode = c.code.coding[0].code;
-                        if (cCode === "8480-6") record.sbp = c.valueQuantity.value;
-                        if (cCode === "8462-4") record.dbp = c.valueQuantity.value;
+                        if (cCode === "8480-6") res.sbp = c.valueQuantity.value;
+                        if (cCode === "8462-4") res.dbp = c.valueQuantity.value;
                     });
-                    document.getElementById('v-bp').innerText = `${record.sbp}/${record.dbp}`;
                 }
             });
-            return record;
+            return res;
         }
 
-        function renderUI(data) {
-            // 更新圖表 (範例)
-            const ctx = document.getElementById('mainChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',
+        function calcAvg(arr) {
+            const n = arr.length;
+            return {
+                bmi: arr.reduce((a, b) => a + b.bmi, 0) / n,
+                sbp: arr.reduce((a, b) => a + b.sbp, 0) / n,
+                dbp: arr.reduce((a, b) => a + b.dbp, 0) / n,
+                glucose: arr.reduce((a, b) => a + b.glucose, 0) / n
+            };
+        }
+
+        function updateBanner(p) {
+            document.getElementById('disp-name').innerText = p.name;
+            document.getElementById('name-icon').innerText = p.name[0];
+            document.getElementById('disp-id').innerText = p.id;
+            document.getElementById('disp-gender').innerText = p.gender === 'male' ? '男' : '女';
+            const age = p.birth ? new Date().getFullYear() - new Date(p.birth).getFullYear() : "--";
+            document.getElementById('disp-age').innerText = age;
+        }
+
+        function renderAllCharts(cur, avg) {
+            // 雷達比較圖
+            new Chart('compareRadarChart', {
+                type: 'radar',
                 data: {
-                    labels: data.map(d => d.name),
-                    datasets: [{
-                        label: 'BMI 指數',
-                        data: data.map(d => d.bmi),
-                        backgroundColor: '#6366f1'
-                    }]
+                    labels: ['BMI', '收縮壓', '舒張壓', '血糖值'],
+                    datasets: [
+                        { label: cur.name + ' (您)', data: [cur.bmi, cur.sbp, cur.dbp, cur.glucose], borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.2)', borderWidth: 3 },
+                        { label: '26人平均', data: [avg.bmi, avg.sbp, avg.dbp, avg.glucose], borderColor: '#94a3b8', borderDash: [5, 5], fill: false }
+                    ]
                 },
-                options: { maintainAspectRatio: false }
+                options: { scales: { r: { beginAtZero: true } } }
             });
 
-            // 更新警告清單
-            const list = document.getElementById('alert-list');
-            data.forEach(d => {
-                if (d.bmi > 27) {
-                    list.innerHTML += `<div class="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 font-medium rounded shadow-sm">${d.name}: BMI 異常 (${d.bmi})</div>`;
-                }
+            // BMI 柱狀圖
+            new Chart('bmiBarChart', {
+                type: 'bar',
+                data: { labels: ['您的 BMI', '員工平均'], datasets: [{ data: [cur.bmi, avg.bmi], backgroundColor: [cur.bmi > 27 ? '#ef4444' : '#6366f1', '#cbd5e1'] }] }
             });
+            document.getElementById('bmi-text').innerText = `您的 BMI 為 ${cur.bmi.toFixed(1)}，比群體平均${cur.bmi > avg.bmi ? '高' : '低'} ${(Math.abs(cur.bmi - avg.bmi)).toFixed(1)} 單位。`;
         }
 
-        function showDemoMode() {
-            document.getElementById('connection-status').innerText = "DEMO MODE";
-            document.getElementById('connection-status').className = "px-3 py-1 rounded-full text-xs font-black bg-blue-500 text-white";
-            document.getElementById('disp-name').innerText = "測試人員 (林o恩)";
-            document.getElementById('disp-id').innerText = "DEMO-12345";
-            renderUI(backupData);
+        function renderInsights(cur, avg) {
+            const box = document.getElementById('insight-content');
+            let status = cur.bmi > avg.bmi ? "高於平均" : "優於平均";
+            let color = cur.bmi > 27 ? "text-red-600" : "text-green-600";
+
+            box.innerHTML = `
+                <div class="stat-box">
+                    <div class="text-sm text-slate-500 uppercase font-bold">BMI 排名位元</div>
+                    <div class="${color} text-3xl font-black">${status}</div>
+                </div>
+                <ul class="text-sm space-y-3 list-disc pl-4">
+                    <li>收縮壓相差：<span class="font-bold">${(cur.sbp - avg.sbp).toFixed(0)} mmHg</span></li>
+                    <li>血糖偏移度：<span class="font-bold">${((cur.glucose/avg.glucose - 1)*100).toFixed(1)}%</span></li>
+                    <li class="mt-4 text-xs italic text-slate-400">數據來自於 26 位同儕之體檢樣本庫對照分析。</li>
+                </ul>
+            `;
         }
 
-        window.onload = initializeApp;
+        window.onload = startAnalysis;
     </script>
 </body>
 </html>
