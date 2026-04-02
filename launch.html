@@ -8,7 +8,7 @@
         body { 
             font-family: Arial, sans-serif; 
             text-align: center; 
-            margin-top: 100px; 
+            margin-top: 80px; 
             background-color: #f8f9fa;
         }
         .spinner { 
@@ -25,9 +25,18 @@
             100% { transform: rotate(360deg); } 
         }
         .message {
-            margin-top: 30px;
+            margin: 30px 0 10px;
             font-size: 18px;
             color: #333;
+        }
+        .warning {
+            color: #d9534f;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        .demo-link {
+            margin-top: 30px;
+            font-size: 16px;
         }
     </style>
 </head>
@@ -37,15 +46,50 @@
     <div class="message">請稍候，正在進行FHIR授權...</div>
 
     <script>
-        // 使用大會提供之測試用憑證（第二階段）
+        // 第二階段測試用憑證
+        const clientId = "cc344727-6f90-496c-94fd-c7829aa9a51d";
+        const clientSecret = "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e";
+
+        // 檢查是否透過 SMART Launcher 啟動（有 iss 參數）
+        const urlParams = new URLSearchParams(window.location.search);
+        const iss = urlParams.get('iss');
+
+        if (!iss) {
+            // Demo 模式：直接導向 SMART Health IT 官方 Launcher 測試病人資料
+            document.querySelector('.message').innerHTML = `
+                ⚠️ 目前為 Demo 模式<br>
+                請使用下方連結透過 SMART Launcher 啟動
+            `;
+            document.querySelector('.warning').innerHTML = `
+                <strong>推薦測試方式：</strong><br>
+                請複製以下完整連結到新分頁開啟（會自動帶入病人資料）：
+            `;
+            
+            // 提供直接測試連結（使用 SMART Health IT Sandbox R4）
+            const launchUrl = `https://launch.smarthealthit.org/launch?iss=https://launch.smarthealthit.org/v/r4/fhir&launch=example&client_id=${clientId}`;
+            
+            const demoDiv = document.createElement('div');
+            demoDiv.className = 'demo-link';
+            demoDiv.innerHTML = `
+                <a href="${launchUrl}" target="_blank" style="color:#007bff; text-decoration:underline;">
+                    👉 點此使用 SMART Launcher 測試（推薦）
+                </a><br><br>
+                <small>或直接訪問：<br>
+                <a href="https://launch.smarthealthit.org/" target="_blank">https://launch.smarthealthit.org/</a><br>
+                在 Launcher 中輸入您的 launch URL（通常是您的 launch.html 完整網址）
+                </small>
+            `;
+            document.body.appendChild(demoDiv);
+            
+            // 停止繼續執行授權
+            throw new Error("Demo mode - waiting for proper launch");
+        }
+
+        // 正常透過 Launcher 啟動時執行授權
         FHIR.oauth2.authorize({
-            client_id: "cc344727-6f90-496c-94fd-c7829aa9a51d", 
-            client_secret: "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e",
-            
-            // 設定存取權限範圍
-            scope: "launch patient/Observation.read patient/Condition.read patient/Patient.read user/*.read openid profile", 
-            
-            // 授權成功後的重導向頁面
+            client_id: clientId,
+            client_secret: clientSecret,
+            scope: "launch patient/Observation.read patient/Condition.read patient/Patient.read user/*.read openid profile",
             redirect_uri: "./index.html"
         });
     </script>
