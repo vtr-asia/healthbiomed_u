@@ -16,39 +16,23 @@
         .chart-container { position: relative; height: 360px; }
         .detail-panel { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
         .detail-panel.open { max-height: 800px; }
-        #detailModal { transition: opacity 0.3s; }
     </style>
 </head>
 <body class="p-6 md:p-10 font-sans">
 
-    <!-- Header -->
     <header class="max-w-7xl mx-auto text-center mb-10">
         <div class="flex items-center justify-center gap-4 mb-4">
             <div class="w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center text-white font-bold text-3xl shadow-lg">健</div>
             <h1 class="text-4xl md:text-5xl font-bold text-indigo-800">好健康 - 勞工體格管理分析</h1>
         </div>
-        <p class="text-lg text-gray-600">使用單位：醫療院所　|　分析對象：26 名員工體檢資料</p>
+        <p id="sub-header" class="text-lg text-gray-600">載入中...</p>
     </header>
 
-    <!-- FHIR 連線狀態 -->
-    <div id="fhirBanner" class="max-w-3xl mx-auto mb-6 hidden">
-        <div id="fhirBannerInner" class="rounded-xl px-6 py-4 text-center font-semibold text-base"></div>
+    <div id="status" class="text-center text-xl font-medium text-indigo-700 mb-10 flex items-center justify-center gap-3">
+        <div class="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+        系統初始化與資料同步中...
     </div>
 
-    <!-- FHIR 病人卡片（OAuth 成功後顯示） -->
-    <div id="fhirPatientSection" class="max-w-3xl mx-auto mb-8 hidden">
-        <div class="card p-6">
-            <h2 class="text-xl font-bold text-indigo-700 mb-4">📋 FHIR 病人資料（來自 SMART Health IT）</h2>
-            <div id="fhirPatientCards"></div>
-        </div>
-    </div>
-
-    <div id="status" class="text-center text-xl font-medium text-green-700 mb-10 flex items-center justify-center gap-3">
-        <div class="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-        資料分析中...
-    </div>
-
-    <!-- 圖表區 -->
     <div id="charts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12 opacity-0 transition-opacity duration-800">
         <div class="card p-6 cursor-pointer" onclick="showDetail('threeHigh')">
             <h2 class="text-2xl font-semibold text-indigo-700 mb-4 text-center">三高分佈</h2>
@@ -72,334 +56,18 @@
         </div>
     </div>
 
-    <!-- 異常員工警示清單 -->
     <div class="card p-8 max-w-5xl mx-auto mb-12">
         <h2 class="text-3xl font-bold text-red-700 mb-6 text-center">異常員工警示清單</h2>
         <div id="abnormalList" class="space-y-4"></div>
     </div>
 
-    <!-- 匯出按鈕 -->
     <div class="max-w-7xl mx-auto text-center mt-12">
         <button onclick="exportToPDF()" class="px-10 py-5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-xl shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all text-lg">
             下載完整 PDF 報告
         </button>
     </div>
 
-    <!-- Modal -->
     <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50">
         <div class="bg-white rounded-2xl p-8 max-w-4xl w-11/12 max-h-[90vh] overflow-y-auto relative shadow-2xl">
             <button onclick="closeModal()" class="absolute top-4 right-6 text-gray-600 hover:text-gray-900 text-4xl font-bold">&times;</button>
-            <h3 id="modalTitle" class="text-2xl md:text-3xl font-bold mb-6 text-indigo-800 border-b pb-3"></h3>
-            <div id="modalContent" class="space-y-4 text-gray-800"></div>
-        </div>
-    </div>
-
-    <script>
-        // ===================== 本地 Demo 資料 =====================
-        const healthData = [
-            { name: "林o恩", height:177, weight:112, bmi:35.7, sbp:132, dbp:81, waist:100, glucose:100, cholesterol:230, tg:92, hdl:72, ldl:93, creatinine:1.0 },
-            { name: "陳o霖", height:154, weight:78, bmi:32.9, sbp:150, dbp:105, waist:61, glucose:105, cholesterol:240, tg:107, hdl:70, ldl:75, creatinine:0.8 },
-            { name: "張o晴", height:165, weight:98, bmi:36.0, sbp:116, dbp:84, waist:93, glucose:92, cholesterol:178, tg:50, hdl:46, ldl:156, creatinine:0.8 },
-            { name: "蔡o宏", height:178, weight:91, bmi:28.7, sbp:120, dbp:67, waist:105, glucose:80, cholesterol:152, tg:146, hdl:53, ldl:148, creatinine:1.2 },
-            { name: "許o筑", height:171, weight:80, bmi:27.4, sbp:128, dbp:78, waist:70, glucose:95, cholesterol:182, tg:99, hdl:68, ldl:85, creatinine:0.9 },
-            { name: "郭o翔", height:160, weight:68, bmi:26.6, sbp:132, dbp:72, waist:63, glucose:75, cholesterol:173, tg:73, hdl:47, ldl:109, creatinine:1.1 },
-            { name: "王o萱", height:156, weight:70, bmi:28.8, sbp:136, dbp:83, waist:78, glucose:106, cholesterol:170, tg:91, hdl:67, ldl:111, creatinine:1.2 },
-            { name: "楊o維", height:180, weight:53, bmi:16.4, sbp:123, dbp:81, waist:63, glucose:88, cholesterol:156, tg:143, hdl:40, ldl:158, creatinine:0.8 },
-            { name: "郭o涵", height:159, weight:98, bmi:38.8, sbp:104, dbp:67, waist:62, glucose:134, cholesterol:252, tg:147, hdl:52, ldl:94, creatinine:1.0 },
-            { name: "曾o安", height:176, weight:71, bmi:22.9, sbp:120, dbp:67, waist:93, glucose:104, cholesterol:171, tg:70, hdl:51, ldl:75, creatinine:0.9 },
-            { name: "趙o豪", height:158, weight:100, bmi:40.1, sbp:125, dbp:90, waist:69, glucose:82, cholesterol:194, tg:51, hdl:49, ldl:154, creatinine:1.1 },
-            { name: "林o瑄", height:167, weight:85, bmi:30.5, sbp:100, dbp:90, waist:68, glucose:102, cholesterol:178, tg:148, hdl:79, ldl:72, creatinine:0.6 },
-            { name: "劉o宇", height:159, weight:96, bmi:38.0, sbp:108, dbp:77, waist:79, glucose:91, cholesterol:259, tg:80, hdl:56, ldl:91, creatinine:0.7 },
-            { name: "陳o雅", height:157, weight:106, bmi:43.0, sbp:112, dbp:83, waist:93, glucose:74, cholesterol:220, tg:77, hdl:61, ldl:153, creatinine:0.8 },
-            { name: "黃o哲", height:169, weight:77, bmi:27.0, sbp:140, dbp:77, waist:70, glucose:99, cholesterol:183, tg:125, hdl:47, ldl:133, creatinine:0.7 },
-            { name: "王o妤", height:178, weight:46, bmi:14.5, sbp:136, dbp:67, waist:89, glucose:92, cholesterol:165, tg:165, hdl:67, ldl:79, creatinine:1.0 },
-            { name: "郭o翰", height:156, weight:98, bmi:40.3, sbp:136, dbp:79, waist:75, glucose:106, cholesterol:172, tg:165, hdl:51, ldl:107, creatinine:0.7 },
-            { name: "林o彤", height:167, weight:90, bmi:32.3, sbp:128, dbp:81, waist:84, glucose:76, cholesterol:217, tg:148, hdl:80, ldl:151, creatinine:1.1 },
-            { name: "張o瑋", height:161, weight:90, bmi:34.7, sbp:164, dbp:104, waist:105, glucose:76, cholesterol:178, tg:179, hdl:41, ldl:157, creatinine:1.1 },
-            { name: "陳o萱", height:188, weight:91, bmi:25.7, sbp:122, dbp:83, waist:103, glucose:72, cholesterol:183, tg:56, hdl:55, ldl:89, creatinine:1.0 },
-            { name: "劉o駿", height:170, weight:55, bmi:19.0, sbp:179, dbp:111, waist:110, glucose:106, cholesterol:248, tg:115, hdl:49, ldl:108, creatinine:1.3 },
-            { name: "楊o琪", height:180, weight:66, bmi:20.4, sbp:134, dbp:90, waist:88, glucose:84, cholesterol:190, tg:82, hdl:69, ldl:130, creatinine:0.6 },
-            { name: "吳o辰", height:185, weight:92, bmi:26.9, sbp:131, dbp:80, waist:90, glucose:89, cholesterol:175, tg:159, hdl:46, ldl:149, creatinine:1.0 },
-            { name: "鄭o晴", height:171, weight:71, bmi:24.3, sbp:134, dbp:87, waist:92, glucose:93, cholesterol:203, tg:177, hdl:68, ldl:135, creatinine:1.2 },
-            { name: "邱o諺", height:186, weight:88, bmi:25.4, sbp:110, dbp:72, waist:71, glucose:71, cholesterol:208, tg:94, hdl:59, ldl:156, creatinine:1.2 },
-            { name: "許o媗", height:184, weight:65, bmi:19.2, sbp:180, dbp:118, waist:103, glucose:76, cholesterol:258, tg:92, hdl:60, ldl:76, creatinine:1.1 }
-        ];
-
-        // ===================== 分類與建議 =====================
-        function classifyAndSuggest(person) {
-            const highBP       = person.sbp >= 140 || person.dbp >= 90;
-            const highGlucose  = person.glucose >= 100;
-            const highChol     = person.cholesterol >= 200;
-            const highTG       = person.tg >= 150;
-            const lowHDL       = person.hdl < 50;
-            const bigWaist     = person.waist >= 90 || person.waist >= 80;
-
-            const bmiLevel = person.bmi < 18.5 ? '過輕' :
-                             person.bmi < 24    ? '正常' :
-                             person.bmi < 27    ? '過重' :
-                             person.bmi < 30    ? '輕度肥胖' :
-                             person.bmi < 35    ? '中度肥胖' : '重度肥胖';
-
-            const bpLevel = person.sbp < 120 && person.dbp < 80 ? '正常' :
-                            person.sbp < 130 && person.dbp < 80 ? '血壓升高' :
-                            person.sbp < 140 || person.dbp < 90 ? '第1期高血壓' : '第2期高血壓';
-
-            const egfr = person.creatinine <= 0.8 ? '≥90' :
-                         person.creatinine <= 1.0 ? '60-89' :
-                         person.creatinine <= 1.3 ? '45-59' : '<45';
-
-            const metCount   = [bigWaist, highBP, highGlucose, highTG, lowHDL].filter(Boolean).length;
-            const hasMetabolic = metCount >= 3;
-
-            let abnormalities = [], suggestions = [];
-
-            if (highBP || highGlucose || highChol || highTG || lowHDL) {
-                abnormalities.push('三高相關異常');
-                suggestions.push("建議定期監測血壓、血糖、血脂，控制飲食，避免高油高糖高鹽食物。");
-            }
-            if (person.bmi >= 27) {
-                abnormalities.push(`BMI過重或肥胖 (${person.bmi.toFixed(1)})`);
-                suggestions.push(`BMI ${person.bmi.toFixed(1)}，建議每週至少150分鐘中等強度運動，並控制每日熱量攝取。`);
-            }
-            if (bigWaist) {
-                abnormalities.push(`腰圍過大 (${person.waist} cm)`);
-                suggestions.push(`腰圍 ${person.waist} cm，建議減重5-10%以降低心血管與代謝風險。`);
-            }
-            if (hasMetabolic) {
-                abnormalities.push('代謝症候群');
-                suggestions.push("符合代謝症候群標準，建議找醫師進行全面評估與生活型態介入。");
-            }
-            if (bpLevel.includes('高血壓')) {
-                abnormalities.push(`高血壓 (${bpLevel})`);
-                suggestions.push(`血壓 ${person.sbp}/${person.dbp} mmHg，建議低鈉飲食、規律運動，並在家持續量測。`);
-            }
-            if (egfr === '45-59' || egfr === '<45') {
-                abnormalities.push(`eGFR偏低 (${egfr} mL/min)`);
-                suggestions.push("腎功能有下降趨勢，建議多喝水、避免過量蛋白質，並定期追蹤。");
-            }
-            if (abnormalities.length === 0) {
-                suggestions.push("目前主要指標正常，繼續維持良好生活習慣！");
-            }
-            return { abnormalities, suggestions, count: abnormalities.length, bmiLevel, bpLevel, egfr, hasMetabolic };
-        }
-
-        // ===================== 圖表與統計 =====================
-        let categoryData = {};
-        let chartsDrawn = false;
-
-        function analyzeAndDraw() {
-            if (chartsDrawn) return;
-            chartsDrawn = true;
-
-            const stats = {
-                threeHigh: { normal:0, one:0, two:0, three:0 },
-                bmi: { '過輕':0, '正常':0, '過重':0, '輕度肥胖':0, '中度肥胖':0, '重度肥胖':0 },
-                metabolic: { yes:0, no:0 },
-                egfr: { '≥90':0, '60-89':0, '45-59':0, '<45':0 },
-                bpLevel: { '正常':0, '血壓升高':0, '第1期高血壓':0, '第2期高血壓':0 }
-            };
-            categoryData = { threeHigh:[], bmi:[], metabolic:[], egfr:[], bp:[] };
-
-            healthData.forEach(person => {
-                const c = classifyAndSuggest(person);
-                let highCount = (person.sbp>=140||person.dbp>=90?1:0) + (person.glucose>=100?1:0) + (person.cholesterol>=200?1:0);
-                if (highCount===0) stats.threeHigh.normal++;
-                else if (highCount===1) stats.threeHigh.one++;
-                else if (highCount===2) stats.threeHigh.two++;
-                else stats.threeHigh.three++;
-                stats.bmi[c.bmiLevel]++;
-                stats.metabolic[c.hasMetabolic ? 'yes' : 'no']++;
-                stats.egfr[c.egfr]++;
-                stats.bpLevel[c.bpLevel]++;
-                if (c.count > 0) {
-                    const item = { name: person.name, abnormalities: c.abnormalities, count: c.count, suggestions: c.suggestions };
-                    if (c.hasMetabolic) categoryData.metabolic.push(item);
-                    if (person.bmi >= 27) categoryData.bmi.push(item);
-                    if (highCount > 0) categoryData.threeHigh.push(item);
-                    if (c.egfr === '45-59' || c.egfr === '<45') categoryData.egfr.push(item);
-                    if (c.bpLevel.includes('高血壓')) categoryData.bp.push(item);
-                }
-            });
-
-            const total = healthData.length;
-            const percent = n => `${((n/total)*100).toFixed(1)}%`;
-            const chartOptions = {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' },
-                    tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw} 人 (${percent(ctx.raw)})` } }
-                }
-            };
-
-            new Chart('chartThreeHigh', { type:'bar', data:{ labels:['無三高','一項','兩項','三高'], datasets:[{ data:Object.values(stats.threeHigh), backgroundColor:['#10b981','#fbbf24','#f97316','#ef4444'], borderRadius:8 }] }, options:chartOptions });
-            new Chart('chartBMI', { type:'doughnut', data:{ labels:Object.keys(stats.bmi), datasets:[{ data:Object.values(stats.bmi), backgroundColor:['#60a5fa','#34d399','#fbbf24','#f97316','#ef4444','#991b1b'] }] }, options:chartOptions });
-            new Chart('chartMetabolic', { type:'pie', data:{ labels:['有代謝症候群','無'], datasets:[{ data:Object.values(stats.metabolic), backgroundColor:['#ef4444','#10b981'] }] }, options:chartOptions });
-            new Chart('chartEGFR', { type:'bar', data:{ labels:Object.keys(stats.egfr), datasets:[{ data:Object.values(stats.egfr), backgroundColor:['#10b981','#60a5fa','#fbbf24','#ef4444'], borderRadius:8 }] }, options:chartOptions });
-            new Chart('chartBPLevel', { type:'bar', data:{ labels:Object.keys(stats.bpLevel), datasets:[{ data:Object.values(stats.bpLevel), backgroundColor:['#10b981','#60a5fa','#fbbf24','#ef4444'], borderRadius:8 }] }, options:chartOptions });
-
-            document.getElementById('status').innerHTML = `<span class="text-green-600 font-bold">✔ 分析完成</span> 已載入 ${total} 筆資料`;
-            document.getElementById('charts-container').classList.remove('opacity-0');
-            renderAbnormalList();
-        }
-
-        function renderAbnormalList() {
-            const container = document.getElementById('abnormalList');
-            let html = '';
-            healthData.forEach((person, index) => {
-                const { abnormalities, suggestions, count } = classifyAndSuggest(person);
-                if (count === 0) return;
-                html += `
-                <div class="bg-white border border-red-200 rounded-lg shadow-sm overflow-hidden">
-                    <button class="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-red-50 transition"
-                            onclick="document.getElementById('detail-${index}').classList.toggle('open')">
-                        <div>
-                            <span class="font-bold text-red-700">${person.name}</span>
-                            <span class="ml-3 text-sm text-red-600">(${count} 項異常)</span>
-                        </div>
-                        <span class="text-gray-500">▼</span>
-                    </button>
-                    <div id="detail-${index}" class="detail-panel px-6 pb-4 bg-red-50">
-                        <ul class="list-disc pl-5 mt-3 space-y-2">
-                            ${abnormalities.map(a => `<li class="text-red-700 font-medium">${a}</li>`).join('')}
-                        </ul>
-                        <div class="mt-4 space-y-3">
-                            <p class="font-semibold text-indigo-700">健康建議：</p>
-                            ${suggestions.map(s => `<p class="text-gray-800">• ${s}</p>`).join('')}
-                        </div>
-                    </div>
-                </div>`;
-            });
-            container.innerHTML = html || '<p class="text-center text-gray-600 py-8">目前無明顯異常員工</p>';
-        }
-
-        function showDetail(category) {
-            const titles = { threeHigh:"三高相關異常員工", bmi:"BMI 過重或肥胖員工", metabolic:"代謝症候群員工", egfr:"腎絲球過濾率偏低員工", bp:"高血壓員工" };
-            document.getElementById('modalTitle').textContent = titles[category] || "詳細資料";
-            const items = categoryData[category] || [];
-            document.getElementById('modalContent').innerHTML = items.length === 0
-                ? '<p class="text-center text-gray-600 py-10">此類別目前無異常員工</p>'
-                : items.map(item => `
-                    <div class="p-4 bg-red-50 rounded-lg border border-red-100">
-                        <p class="font-bold text-red-700 mb-2">${item.name} (${item.count} 項)</p>
-                        <ul class="list-disc pl-5 text-sm space-y-1">
-                            ${item.abnormalities.map(a => `<li>${a}</li>`).join('')}
-                        </ul>
-                    </div>`).join('');
-            document.getElementById('detailModal').classList.remove('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('detailModal').classList.add('hidden');
-        }
-
-        async function exportToPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm' });
-            doc.setFontSize(22);
-            doc.text("好健康 - 勞工體格管理分析報告", 20, 25);
-            doc.setFontSize(12);
-            doc.text(`生成日期：${new Date().toLocaleDateString('zh-TW')}　|　分析對象：26 名員工`, 20, 35);
-            try {
-                const canvas = await html2canvas(document.body, { scale: 1.5, useCORS: true });
-                const imgData = canvas.toDataURL('image/png');
-                const imgWidth = 280, pageHeight = 200;
-                const imgHeight = canvas.height * imgWidth / canvas.width;
-                let heightLeft = imgHeight, position = 50;
-                doc.addImage(imgData, 'PNG', 15, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
-                while (heightLeft >= 0) {
-                    position = heightLeft - imgHeight;
-                    doc.addPage();
-                    doc.addImage(imgData, 'PNG', 15, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
-                }
-                doc.save('勞工體檢分析報告.pdf');
-            } catch (err) {
-                alert('PDF 生成失敗，請檢查瀏覽器設定或稍後再試');
-                console.error(err);
-            }
-        }
-
-        // ===================== FHIR 病人資料讀取 =====================
-        function showBanner(type, msg) {
-            const wrap  = document.getElementById('fhirBanner');
-            const inner = document.getElementById('fhirBannerInner');
-            wrap.classList.remove('hidden');
-            const styles = {
-                ok:   'bg-green-100 text-green-800 border border-green-300',
-                warn: 'bg-yellow-100 text-yellow-800 border border-yellow-300',
-                err:  'bg-red-100 text-red-800 border border-red-300'
-            };
-            inner.className = `rounded-xl px-6 py-4 text-center font-semibold text-base ${styles[type] || styles.warn}`;
-            inner.innerHTML = msg;
-        }
-
-        function renderFhirPatients(patients) {
-            if (!patients || patients.length === 0) return;
-            const section = document.getElementById('fhirPatientSection');
-            const cards   = document.getElementById('fhirPatientCards');
-            section.classList.remove('hidden');
-            cards.innerHTML = patients.map(p => {
-                const n   = p.name?.[0] || {};
-                const name = n.text || [[...(n.given||[])].join(' '), n.family].filter(Boolean).join(' ') || '未知姓名';
-                let age = '未知';
-                if (p.birthDate) age = Math.floor((Date.now() - new Date(p.birthDate)) / 31557600000) + ' 歲';
-                const gender = { male:'男', female:'女' }[p.gender] || '其他';
-                const idVal  = p.identifier?.[0]?.value || p.id;
-                return `<div class="flex items-start gap-4 p-4 bg-indigo-50 rounded-xl border border-indigo-100 mb-3">
-                    <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">👤</div>
-                    <div>
-                        <div class="font-bold text-indigo-800 text-lg">${name}</div>
-                        <div class="text-gray-600 text-sm mt-1">
-                            性別：${gender}　年齡：${age}　生日：${p.birthDate || '—'}<br>
-                            Patient ID：<code class="bg-white px-1 rounded">${p.id}</code>　識別碼：${idVal}
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        // ✅ 修復 5：新增 FHIR.oauth2.ready() 完成 token exchange，並讀取真實病人資料
-        async function initFHIR() {
-            try {
-                const client = await FHIR.oauth2.ready();
-                showBanner('ok', '✅ 已成功連線至 SMART Health IT Sandbox');
-
-                // 取得 launch context 中的 patient ID
-                const patientId = client.getPatientId();
-
-                let patients = [];
-                if (patientId) {
-                    // EHR launch：直接讀單一病人
-                    const pt = await client.request(`Patient/${patientId}`);
-                    patients = [pt];
-                } else {
-                    // standalone：搜尋最近 5 筆
-                    const bundle = await client.request('Patient?_count=5&_sort=-_lastUpdated');
-                    patients = (bundle.entry || []).map(e => e.resource);
-                }
-
-                if (patients.length > 0) {
-                    renderFhirPatients(patients);
-                    showBanner('ok', `✅ FHIR 連線成功｜已載入 ${patients.length} 位病人資料（Patient ID: ${patients.map(p=>p.id).join(', ')}）`);
-                } else {
-                    showBanner('warn', '⚠️ FHIR 連線成功，但未取得病人資料');
-                }
-
-            } catch (err) {
-                // OAuth 未啟動（直接開啟頁面）→ Demo 模式正常運作
-                console.warn('FHIR OAuth 未啟動，以 Demo 模式運作：', err.message);
-                showBanner('warn', '⚠️ Demo 模式運行（未透過 SMART launcher 啟動）');
-            }
-        }
-
-        // ===================== 啟動 =====================
-        window.onload = () => {
-            // 先畫圖表（Demo 資料，無論 FHIR 是否成功都會顯示）
-            setTimeout(analyzeAndDraw, 1200);
-            // 同時嘗試 FHIR OAuth（若從 launcher 進來則成功，否則靜默降級）
-            initFHIR();
-        };
-    </script>
-</body>
-</html>
+            <h3 id="modalTitle" class="text-

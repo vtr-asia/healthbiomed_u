@@ -2,99 +2,100 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>勞工體格管理分析 - 啟動中</title>
+    <title>勞工體格管理分析 - 系統啟動</title>
     <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
     <style>
         body { 
-            font-family: 'Microsoft JhengHei', Arial, sans-serif; 
+            font-family: "Microsoft JhengHei", Arial, sans-serif; 
             text-align: center; 
-            margin-top: 80px; 
-            background-color: #f8f9fa;
+            margin-top: 100px; 
+            background-color: #f0f4f8;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            display: inline-block;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 600px;
         }
         .spinner { 
             display: inline-block; 
-            width: 50px; 
-            height: 50px; 
-            border: 5px solid #f3f3f3; 
-            border-top: 5px solid #3498db; 
+            width: 40px; 
+            height: 40px; 
+            border: 4px solid #f3f3f3; 
+            border-top: 4px solid #3498db; 
             border-radius: 50%; 
             animation: spin 1s linear infinite; 
+            margin-bottom: 20px;
         }
         @keyframes spin { 
             0% { transform: rotate(0deg); } 
             100% { transform: rotate(360deg); } 
         }
-        .message {
-            margin: 30px 0 10px;
-            font-size: 18px;
-            color: #333;
-        }
-        .demo-box {
-            background: #fff;
-            border: 1px solid #dee2e6;
-            padding: 20px;
-            display: inline-block;
-            border-radius: 8px;
-            margin-top: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
         .btn {
             background-color: #007bff;
             color: white;
-            padding: 10px 20px;
+            padding: 12px 24px;
             text-decoration: none;
-            border-radius: 5px;
+            border-radius: 6px;
             display: inline-block;
-            margin-top: 15px;
+            margin-top: 20px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .btn:hover { background-color: #0056b3; }
+        .demo-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            border-radius: 6px;
+            text-align: left;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
-    <h2>勞工體格管理分析系統</h2>
-    <div id="loading-ui">
-        <div class="spinner"></div>
-        <div class="message">正在連線至 FHIR 伺服器進行授權...</div>
-    </div>
 
-    <div id="demo-ui" style="display:none;">
-        <div class="demo-box">
-            <p>⚠️ <strong>檢測到非正式啟動：</strong></p>
-            <p>本系統需要透過 SMART Launcher 取得病人資料授權。</p>
-            <a id="launch-btn" href="#" class="btn">前往 SMART Launcher 測試 (R4 資料庫)</a>
-            <p><small>伺服器：https://launch.smarthealthit.org/v/r4/fhir</small></p>
+    <div class="container">
+        <div id="loading-zone">
+            <div class="spinner"></div>
+            <h2>正在啟動勞工體格管理分析系統...</h2>
+            <p>正在與 FHIR 伺服器進行安全授權連線，請稍候。</p>
+        </div>
+
+        <div id="demo-zone" style="display:none;">
+            <h2 style="color: #d9534f;">⚠️ 偵測到非授權啟動 (Demo 模式)</h2>
+            <p>本應用程式需要透過 SMART Launcher 取得病人醫療資料授權。</p>
+            
+            <div class="demo-info">
+                <strong>測試說明：</strong><br>
+                點擊下方按鈕將前往 SMART Health IT 模擬器，系統會預設使用 <strong>R4 測試資料庫</strong>。
+                通過模擬登入後，系統將自動導回並顯示分析結果。
+            </div>
+
+            <a id="launch-link" href="#" class="btn">透過 SMART Launcher 模擬啟動</a>
         </div>
     </div>
 
     <script>
-        // 設定專案憑證
+        // 設定應用的 Client ID (與原代碼一致)
         const clientId = "cc344727-6f90-496c-94fd-c7829aa9a51d";
+        // 測試環境通常不需要 client_secret，若伺服器強制要求則保留
         const clientSecret = "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e";
 
-        // 獲取網址參數，檢查是否有 iss (FHIR Server Base URL)
+        // 檢查網址是否有 iss 參數
         const urlParams = new URLSearchParams(window.location.search);
         const iss = urlParams.get('iss');
 
         if (iss) {
-            // 情況 A：正常啟動，執行 OAuth2 授權流程
+            // --- 正常啟動流程 ---
             FHIR.oauth2.authorize({
                 client_id: clientId,
                 client_secret: clientSecret,
-                // 定義需要讀取的病人資料權限
+                // 定義需要讀取的範圍：包含病人基本資料、觀測值(體檢數據)、及疾病診斷
                 scope: "launch patient/Observation.read patient/Condition.read patient/Patient.read openid profile",
-                redirect_uri: "./index.html"
-            });
-        } else {
-            // 情況 B：直接開啟網頁，顯示引導連結
-            document.getElementById('loading-ui').style.display = 'none';
-            document.getElementById('demo-ui').style.display = 'block';
-
-            // 動態產生 SMART Health IT Launcher 連結
-            // 使用 R4 版本的模擬資料路徑
-            const fhirServer = "https://launch.smarthealthit.org/v/r4/fhir";
-            const launchUrl = `https://launch.smarthealthit.org/launch?iss=${fhirServer}&launch=example&client_id=${clientId}`;
-            
-            document.getElementById('launch-btn').href = launchUrl;
-        }
-    </script>
-</body>
-</html>
+                redirect_uri:
